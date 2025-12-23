@@ -14,71 +14,70 @@ from keyboards.visibilityKeyboard import get_hide_keyboard, get_show_keyboard
 router = Router()
 round = 0
 
+async def handle_start_round(user_id: int, message_or_callback, is_callback: bool = True):
+    if user_id not in st.USER_ROOMS:
+        text = "Вы не в комнате!"
+        if is_callback:
+            await message_or_callback.answer(text, show_alert=True)
+        else:
+            await message_or_callback.answer(text)
+        return
+
+    room_code = st.USER_ROOMS[user_id]
+    room = st.ACTIVE_ROOMS[room_code]
+
+    if room['host_id'] != user_id:
+        text = "Только хост может начать раунд!"
+        if is_callback:
+            await message_or_callback.answer(text, show_alert=True)
+        else:
+            await message_or_callback.answer(text)
+        return
+
+    if len(room['players']) < st.MIN_PLAYERS:
+        text = "❌ Игроков не хватает!"
+        if is_callback:
+            await message_or_callback.message.answer(text)
+            await message_or_callback.answer()
+        else:
+            await message_or_callback.answer(text)
+        return
+
+    room['round'] += 1
+    room['status'] = 'playing'
+    result_users = gl.game_round(room['players'])
+
+    for player_id, data in result_users.items():
+        caption = f"Раунд: {room['round']}\nКарта скрыта. Нажмите «Показать», чтобы увидеть свою роль."
+        if data['role'] == 'Spy':
+            await message_or_callback.bot.send_photo(
+                chat_id=player_id,
+                photo=FSInputFile(st.DEFAULT_CARD_PATH),
+                caption=caption,
+                reply_markup=get_show_keyboard("Spy", None)
+            )
+        else:
+            await message_or_callback.bot.send_photo(
+                chat_id=player_id,
+                photo=FSInputFile(st.DEFAULT_CARD_PATH),
+                caption=caption,
+                reply_markup=get_show_keyboard("NoSpy", data['card'])
+            )
+
+    if is_callback:
+        await message_or_callback.answer()
+
 @router.message(Command('play'))
 async def lets_play(message: types.Message):
     await message.answer('Начните игру!⬇️', reply_markup=kb.main)
 
-@router.message(Command('start_round'))
-async def send_photo_command(message: types.Message):
-    host_id = message.from_user.id
-    room_code = st.USER_ROOMS[host_id]
-    current_room = st.ACTIVE_ROOMS[room_code]
-    current_room['round'] += 1
-
-    if len(current_room['players']) < st.MIN_PLAYERS:
-        await message.answer(text=f'❌ Игроков не хватает!')
-        return
-    
-    current_room['status'] = 'playing'
-    result_users = gl.game_round(current_room['players'])
-    for key, value in result_users.items():
-        
-        if value['role'] == 'Spy':
-            await message.bot.send_photo(
-                            chat_id=key,
-                            photo=FSInputFile(st.DEFAULT_CARD_PATH),
-                            caption=f"Раунд: {current_room['round']}\nКарта скрыта. Нажмите «Показать», чтобы увидеть свою роль.",
-                            reply_markup=get_show_keyboard("Spy", None)
-                        )
-            continue
-        await message.bot.send_photo(
-                        chat_id=key,
-                        photo=FSInputFile(st.DEFAULT_CARD_PATH),
-                        caption=f"Раунд: {current_room['round']}\nКарта скрыта. Нажмите «Показать», чтобы увидеть свою роль.",
-                        reply_markup=get_show_keyboard("NoSpy", value['card'])
-                    )
-
 @router.callback_query(F.data == 'start_round')
-async def send_photo(callback: types.CallbackQuery):
-    host_id = callback.from_user.id
-    room_code = st.USER_ROOMS[host_id]
-    current_room = st.ACTIVE_ROOMS[room_code]
-    current_room['round'] += 1
+async def start_round_callback(callback: types.CallbackQuery):
+    await handle_start_round(callback.from_user.id, callback, is_callback=True)
 
-    if len(current_room['players']) < st.MIN_PLAYERS:
-        await callback.message.answer(text=f'❌ Игроков не хватает!')
-        await callback.answer()
-        return
-    
-    current_room['status'] = 'playing'
-    result_users = gl.game_round(current_room['players'])
-
-    for key, value in result_users.items():
-        if value['role'] == 'Spy':
-            await callback.bot.send_photo(
-                            chat_id=key,
-                            photo=FSInputFile(st.DEFAULT_CARD_PATH),
-                            caption=f"Раунд: {current_room['round']}\nКарта скрыта. Нажмите «Показать», чтобы увидеть свою роль.",
-                            reply_markup=get_show_keyboard("Spy", None)
-                        )
-            continue
-        await callback.bot.send_photo(
-                        chat_id=key,
-                        photo=FSInputFile(st.DEFAULT_CARD_PATH),
-                        caption=f"Раунд: {current_room['round']}\nКарта скрыта. Нажмите «Показать», чтобы увидеть свою роль.",
-                        reply_markup=get_show_keyboard("NoSpy", value['card'])
-                    )
-    await callback.answer()
+@router.message(Command("start_round"))
+async def start_round_command(message: types.Message):
+    await handle_start_round(message.from_user.id, message, is_callback=False)
 
 
 @router.callback_query(F.data.startswith('hide_card:'))

@@ -21,9 +21,10 @@ dp.include_router(game.router)
 async def main():
     commands = [
         BotCommand(command="start", description="Главное меню"),
-        BotCommand(command="play", description="Открыть игровую панель"),
+        BotCommand(command="create", description="Создать комнату"),
+        BotCommand(command="join", description="Присоединиться к комнате"),
         BotCommand(command="leave_room", description="Выйти из комнаты"),
-        BotCommand(command="start_round", description="Начать новый раунд")
+        BotCommand(command="start_round", description="Начать раунд")
     ]
     await bot.set_my_commands(commands)
     await dp.start_polling(bot)
