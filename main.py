@@ -3,7 +3,9 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.types import BotCommand
 from dotenv import load_dotenv
+import threading
 import os
+import health as hl
 
 from handlers import start, room, game
 import storage as st
@@ -27,6 +29,7 @@ async def main():
     ]
     await bot.set_my_commands(commands)
     await dp.start_polling(bot)
+    threading.Thread(target=hl.start_health_server, daemon=True).start()
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
