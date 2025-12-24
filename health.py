@@ -1,3 +1,4 @@
+import os
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 class HealthHandler(BaseHTTPRequestHandler):
@@ -7,5 +8,7 @@ class HealthHandler(BaseHTTPRequestHandler):
         self.wfile.write(b"OK")
 
 def start_health_server():
-    server = HTTPServer(('0.0.0.0', 8000), HealthHandler)
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(('0.0.0.0', port), HealthHandler)
+    print(f"Health server запущен на порту {port}")
     server.serve_forever()
